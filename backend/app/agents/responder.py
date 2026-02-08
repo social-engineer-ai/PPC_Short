@@ -45,6 +45,8 @@ def generate_response(intent: dict, result: dict, context: dict) -> str:
             return _resp_query_next(result)
         elif action == "query_today":
             return _resp_query_today(context)
+        elif action == "query_day":
+            return _resp_query_day(result)
         elif action == "query_week":
             return _resp_query_week(context)
         elif action == "checkin_response":
@@ -71,6 +73,8 @@ def generate_response(intent: dict, result: dict, context: dict) -> str:
             return _resp_pause(result)
         elif action == "manage_subtypes":
             return _resp_manage_subtypes(result)
+        elif action == "chat":
+            return _resp_chat(result)
         elif action == "unknown":
             return _resp_unknown(intent)
         else:
@@ -202,6 +206,27 @@ def _resp_query_week(context):
         d = len([t for t in dt if t.get("status") == "done"])
         lines.append(f"*{day[:3].upper()}*: {d}/{len(dt)} | {hrs}h")
     return "\n".join(lines)
+
+
+def _resp_query_day(result):
+    tasks = result.get("tasks", [])
+    day = result.get("day", "")
+    day_label = day.title() if day else "that day"
+    if not tasks:
+        return f"Nothing scheduled for *{day_label}*."
+    active = [t for t in tasks if t.get("status") not in ("dropped",)]
+    if not active:
+        return f"Nothing scheduled for *{day_label}*."
+    done = [t for t in active if t.get("status") == "done"]
+    lines = [f"*{day_label.upper()}* \u2014 {len(done)}/{len(active)} done\n"]
+    for t in active:
+        icon = "\u2705" if t["status"] == "done" else "\U0001F535" if t["status"] == "doing" else "\u2B1C"
+        lines.append(f"{icon} {t.get('name')} ({t.get('estimated_hours', 0)}h)")
+    return "\n".join(lines)
+
+
+def _resp_chat(result):
+    return "\U0001F4AC Noted. I saved that thought."
 
 
 def _resp_checkin(intent, result, context):

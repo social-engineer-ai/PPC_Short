@@ -160,8 +160,12 @@ def _execute_intent(intent: dict, context: dict) -> dict:
         return _handle_query_next(context)
     elif action == "query_today":
         return {"tasks": context.get("today_tasks", [])}
+    elif action == "query_day":
+        return _handle_query_day(intent, context)
     elif action == "query_week":
         return {"tasks": context.get("week_tasks", [])}
+    elif action == "chat":
+        return _handle_chat(intent, context)
     elif action == "checkin_response":
         return _handle_checkin_response(intent, context)
     elif action == "acknowledge":
@@ -546,6 +550,32 @@ def _handle_manage_subtypes(intent: dict) -> dict:
     final = [s for s in base if s not in removed] + added
 
     return {"action": action, "area": area, "subtype": subtype, "subtypes": {area: final}}
+
+
+def _handle_query_day(intent: dict, context: dict) -> dict:
+    """Return tasks for a specific day of the week."""
+    day = intent.get("day", "").lower()
+    week_tasks = context.get("week_tasks", [])
+    day_tasks = [t for t in week_tasks if t.get("day") == day and t.get("status") != "dropped"]
+    return {"tasks": day_tasks, "day": day}
+
+
+def _handle_chat(intent: dict, context: dict) -> dict:
+    """Save the user's thought as a note and acknowledge it."""
+    message = intent.get("message", "")
+    if message:
+        note_id = str(uuid.uuid4())
+        db.put_item({
+            "pk": "AGENTNOTE",
+            "sk": note_id,
+            "id": note_id,
+            "note": message,
+            "applies_from": _today(),
+            "affects": "general",
+            "active": True,
+            "created_at": datetime.utcnow().isoformat(),
+        })
+    return {"noted": True, "message": message}
 
 
 def _record_checkin(date: str, task_id: str | None, check_type: str, message: str, response: str = None):
