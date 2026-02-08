@@ -49,6 +49,7 @@ def _build_context() -> dict:
     behavior_overrides = db.list_active_behavior_overrides()
     settings = db.get_settings()
     dayplan = db.get_dayplan(today)
+    chat_history = db.get_chat_log(today, limit=15)
 
     return {
         "today": today,
@@ -63,6 +64,7 @@ def _build_context() -> dict:
         "behavior_overrides": behavior_overrides,
         "settings": settings,
         "dayplan": dayplan,
+        "chat_history": chat_history,
     }
 
 
@@ -80,6 +82,9 @@ async def whatsapp_webhook(request: Request):
         # Load context
         context = _build_context()
 
+        # Save user message to chat log
+        db.save_chat_message(context["today"], "user", message_body)
+
         # Parse intent via Claude
         intent = parse_intent(message_body, context)
 
@@ -91,6 +96,10 @@ async def whatsapp_webhook(request: Request):
 
         # Send response via Twilio
         send_whatsapp(response_text)
+
+        # Save agent response to chat log
+        action = intent.get("intent", "unknown")
+        db.save_chat_message(context["today"], "assistant", response_text, intent=action)
 
         # Log the check-in
         _record_checkin(
@@ -127,9 +136,11 @@ async def test_message(request: Request):
         return {"error": "No message provided"}
 
     context = _build_context()
+    db.save_chat_message(context["today"], "user", message)
     intent = parse_intent(message, context)
     result = _execute_intent(intent, context)
     response_text = generate_response(intent, result, context)
+    db.save_chat_message(context["today"], "assistant", response_text, intent=intent.get("intent"))
 
     return {
         "intent": intent,

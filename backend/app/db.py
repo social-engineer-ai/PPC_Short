@@ -204,6 +204,33 @@ def list_active_agent_notes() -> list[dict]:
     ]
 
 
+def get_chat_log(date_str: str, limit: int = 20) -> list[dict]:
+    """Get chat messages for a date, sorted by timestamp (newest last)."""
+    msgs = query_pk(f"CHAT#{date_str}")
+    msgs.sort(key=lambda m: m.get("timestamp", ""))
+    if limit:
+        msgs = msgs[-limit:]
+    return msgs
+
+
+def save_chat_message(date_str: str, role: str, content: str, intent: str = None) -> None:
+    """Save a chat message (user or assistant)."""
+    from datetime import datetime as dt
+    now = dt.utcnow()
+    msg_id = now.strftime("%Y%m%dT%H%M%S%f")
+    item = {
+        "pk": f"CHAT#{date_str}",
+        "sk": msg_id,
+        "role": role,
+        "content": content,
+        "timestamp": now.isoformat(),
+        "date": date_str,
+    }
+    if intent:
+        item["intent"] = intent
+    put_item(item)
+
+
 def list_active_behavior_overrides() -> list[dict]:
     today = datetime.utcnow().strftime("%Y-%m-%d")
     overrides = query_pk("BEHAVIOR")
