@@ -1,0 +1,28 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #08081a;
+  color: #e2e8f0;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #08081a;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a1a3a;
+  border-radius: 3px;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}

@@ -1,0 +1,250 @@
+"""Parse WhatsApp messages into structured intents using Claude API."""
+import json
+import traceback
+from datetime import datetime
+
+from ..config import ANTHROPIC_API_KEY
+
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        import anthropic
+        _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    return _client
+
+
+def parse_intent(message: str, context: dict) -> dict:
+    """Send user message + context to Claude, get structured intent JSON back."""
+    if not ANTHROPIC_API_KEY:
+        return _mock_parse(message)
+
+    system_prompt = _build_system_prompt(context)
+
+    try:
+        client = _get_client()
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[{"role": "user", "content": message}],
+        )
+        text = response.content[0].text.strip()
+        return _extract_json(text)
+    except Exception as e:
+        traceback.print_exc()
+        return {"intent": "unknown", "raw": message, "error": str(e)}
+
+
+def _extract_json(text: str) -> dict:
+    """Extract JSON from Claude's response, handling code blocks."""
+    # Try direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Try extracting from code block
+    if "```" in text:
+        parts = text.split("```")
+        for part in parts[1::2]:  # Odd indices are inside code blocks
+            cleaned = part.strip()
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:].strip()
+            try:
+                return json.loads(cleaned)
+            except json.JSONDecodeError:
+                continue
+
+    # Try finding JSON object in text
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    return {"intent": "unknown", "raw": text}
+
+
+def _build_system_prompt(ctx: dict) -> str:
+    """Build the full system prompt with all context injected."""
+    today = ctx.get("today", datetime.utcnow().strftime("%Y-%m-%d"))
+    day_of_week = ctx.get("day_of_week", datetime.utcnow().strftime("%A"))
+    settings = ctx.get("settings", {})
+    persona = settings.get("agent_persona", "David Goggins")
+
+    # Format projects
+    projects_text = ""
+    for p in ctx.get("projects", []):
+        keywords = ", ".join(p.get("match_keywords", []))
+        projects_text += f"- {p.get('name')} (area: {p.get('area')}, id: {p.get('id') or p.get('sk')}) [keywords: {keywords}]\n"
+
+    # Format today's tasks
+    tasks_text = ""
+    for i, t in enumerate(ctx.get("today_tasks", []), 1):
+        status = t.get("status", "todo")
+        tasks_text += f"{i}. [{status}] {t.get('name')} ({t.get('estimated_hours', 0)}h, {t.get('priority', 'normal')})\n"
+    if not tasks_text:
+        tasks_text = "(no tasks scheduled for today)\n"
+
+    # Format week schedule summary
+    week_tasks = ctx.get("week_tasks", [])
+    week_text = ""
+    for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
+        day_tasks = [t for t in week_tasks if t.get("day") == day and t.get("status") not in ("dropped",)]
+        hrs = sum(t.get("estimated_hours", 0) for t in day_tasks)
+        done = len([t for t in day_tasks if t.get("status") == "done"])
+        total = len(day_tasks)
+        free = max(0, 8 - hrs)
+        week_text += f"  {day.title()}: {hrs}h planned, {done}/{total} done, {free}h free\n"
+        for t in day_tasks:
+            week_text += f"    - {t.get('name')} ({t.get('status')}, {t.get('estimated_hours', 0)}h)\n"
+
+    # Format pending task
+    pending = ctx.get("pending")
+    pending_text = "null"
+    if pending:
+        pending_text = json.dumps(pending.get("task", {}), indent=2)
+        needs = pending.get("needs", [])
+        pending_text += f"\nMissing fields: {needs}"
+
+    # Format recent check-ins
+    checkins_text = ""
+    for ci in ctx.get("recent_checkins", [])[-3:]:
+        checkins_text += f"- [{ci.get('type')}] {ci.get('message_sent', '')[:80]}...\n"
+        if ci.get("response"):
+            checkins_text += f"  User replied: {ci['response']}\n"
+    if not checkins_text:
+        checkins_text = "(no recent check-ins)\n"
+
+    # Agent notes
+    notes_text = ""
+    for n in ctx.get("agent_notes", []):
+        notes_text += f"- {n.get('note')} (until: {n.get('applies_until', 'indefinite')})\n"
+
+    return f"""You are PCP, a task management assistant for a teaching professor. Parse the user's WhatsApp message and return a JSON object with the intent and parameters.
+
+PERSONALITY: {persona} — be direct, no cheerleading, concise, treat the user as an adult.
+
+CURRENT DATE: {today}
+CURRENT DAY: {day_of_week}
+
+USER'S PROJECTS:
+{projects_text}
+TODAY'S TASKS:
+{tasks_text}
+WEEK SCHEDULE:
+{week_text}
+PENDING TASK (if user is in middle of adding a task):
+{pending_text}
+
+RECENT CONTEXT (last 3 messages):
+{checkins_text}
+ACTIVE NOTES:
+{notes_text or "(none)"}
+
+POSSIBLE INTENTS:
+
+Task intake (smart — infer as much as possible):
+- add_task: {{
+    "intent": "add_task",
+    "tasks": [
+      {{
+        "name": "...",
+        "project_id": "..." or null (if ambiguous, set null and ask),
+        "project_candidates": ["id1", "id2"] (if ambiguous),
+        "subtype": "..." or null,
+        "priority": "urgent|high|normal|low",
+        "estimated_hours": N or null (use defaults: Grading 1.5, Slides 2, Writing 2, Email 0.5, Call 0.5, Meeting 1),
+        "day": "monday|tuesday|...|saturday|sunday" or null,
+        "time_hint": "morning|afternoon|evening" or null,
+        "due_date": "YYYY-MM-DD" or null,
+        "course_week": "N" or null,
+        "needs_clarification": ["project", "hours", "day"] (list of fields agent should ask about),
+        "is_time_block": false (true if personal commitment, not work)
+      }}
+    ],
+    "message_to_user": "..." (confirmation or clarification question)
+  }}
+
+- complete_pending: {{ "intent": "complete_pending", "field": "project|hours|day|confirm", "value": "..." }}
+
+Task management:
+- mark_done: {{ "intent": "mark_done", "task_match": "string to fuzzy match" }}
+- mark_skipped: {{ "intent": "mark_skipped", "task_match": "..." }}
+- mark_doing: {{ "intent": "mark_doing", "task_match": "..." }}
+- move_task: {{ "intent": "move_task", "task_match": "...", "to_day": "wednesday" }}
+- push_tomorrow: {{ "intent": "push_tomorrow", "task_match": "..." }}
+
+Queries:
+- query_next: {{ "intent": "query_next" }}
+- query_today: {{ "intent": "query_today" }}
+- query_week: {{ "intent": "query_week" }}
+
+Check-in responses:
+- checkin_response: {{ "intent": "checkin_response", "status": "done|working|skipped|pushed" }}
+- acknowledge: {{ "intent": "acknowledge" }}
+
+Health tracking:
+- log_food: {{ "intent": "log_food", "entry": "..." }}
+- log_exercise: {{ "intent": "log_exercise", "entry": "...", "duration": "..." }}
+- log_sleep: {{ "intent": "log_sleep", "hours": N, "notes": "..." }}
+
+Subtypes management:
+- manage_subtypes: {{ "intent": "manage_subtypes", "action": "add|remove|list", "area": "teaching|research|admin|personal", "subtype": "..." }}
+  Examples: "add subtype Peer Review to research", "list subtypes for teaching", "remove subtype Labs from teaching"
+
+Reminders & agent config:
+- set_reminder: {{ "intent": "set_reminder", "message": "...", "date": "...", "time": "...", "recurring": null | "daily" | "weekly:day" | "monthly:N" }}
+- delete_reminder: {{ "intent": "delete_reminder", "reminder_number": N }}
+- list_reminders: {{ "intent": "list_reminders" }}
+- modify_behavior: {{ "intent": "modify_behavior", "setting": "...", "value": "...", "duration": "today|tomorrow|this_week|permanent" }}
+- add_note: {{ "intent": "add_note", "note": "...", "applies_until": "..." }}
+- pause_agent: {{ "intent": "pause_agent", "until": "..." }}
+
+Fallback:
+- unknown: {{ "intent": "unknown", "raw": "..." }}
+
+RULES:
+- If the message mentions something to DO, default to add_task intent
+- For add_task: ALWAYS try to infer project from keywords. Match "358" to BADM 358, "signaling" to Signaling Theory, "dentist" to Health, "taxes" to Finances, etc.
+- For add_task: infer subtype from action words: "grade" → Grading, "write/draft" → Writing, "slides/lecture" → Slides, "call/book" → Doctors or Errands
+- For add_task: if user says "by friday" or "due friday", set due_date AND day=friday
+- For add_task: if user's message contains MULTIPLE tasks, return multiple items in the tasks array
+- If a PENDING TASK exists and the user's reply looks like an answer to a question (a number, a day name, "yes", an hour amount), use complete_pending intent
+- If the message is just an emoji (✅, 👍), interpret as acknowledge or checkin_response
+- For task matching, be fuzzy — "slides" matches "Prepare Week 6 slides"
+- If user mentions food, tea, meals, protein, sugar → use log_food
+- If user mentions exercise, gym, run, walk, workout → use log_exercise
+- Return ONLY a valid JSON object"""
+
+
+def _mock_parse(message: str) -> dict:
+    """Simple rule-based parser for local dev without Claude API."""
+    msg = message.lower().strip()
+
+    if msg in ("✅", "👍", "yes", "y", "ok", "done"):
+        return {"intent": "checkin_response", "status": "done"}
+    if msg in ("🔵", "still working"):
+        return {"intent": "checkin_response", "status": "working"}
+    if msg in ("⏭", "skip", "skipped"):
+        return {"intent": "checkin_response", "status": "skipped"}
+    if msg in ("🔄", "push", "pushed"):
+        return {"intent": "checkin_response", "status": "pushed"}
+    if "what's next" in msg or "whats next" in msg:
+        return {"intent": "query_next"}
+    if msg in ("today", "what's today", "show today"):
+        return {"intent": "query_today"}
+    if msg in ("week", "show week"):
+        return {"intent": "query_week"}
+    if msg.startswith("done with "):
+        return {"intent": "mark_done", "task_match": msg[10:]}
+    if msg.startswith("push ") and " to " in msg:
+        parts = msg[5:].rsplit(" to ", 1)
+        return {"intent": "move_task", "task_match": parts[0], "to_day": parts[1]}
+
+    return {"intent": "unknown", "raw": message}
