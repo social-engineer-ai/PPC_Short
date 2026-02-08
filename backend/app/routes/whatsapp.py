@@ -1,11 +1,12 @@
 """WhatsApp webhook handler — the core of the agent."""
 import traceback
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request, Response
 
 from .. import db
+from ..config import TIMEZONE
 from ..agents.intent_parser import parse_intent
 from ..agents.responder import generate_response
 from ..services.twilio_client import send_whatsapp
@@ -20,18 +21,27 @@ from ..services.task_service import (
 router = APIRouter()
 
 
+def _local_now() -> datetime:
+    """Get current datetime in the user's configured timezone."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo(TIMEZONE))
+    except Exception:
+        return datetime.utcnow()
+
+
 def _today() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d")
+    return _local_now().strftime("%Y-%m-%d")
 
 
 def _week_id() -> str:
-    d = datetime.utcnow()
+    d = _local_now()
     iso = d.isocalendar()
     return f"{iso[0]}-W{iso[1]:02d}"
 
 
 def _day_name() -> str:
-    return datetime.utcnow().strftime("%A").lower()
+    return _local_now().strftime("%A").lower()
 
 
 def _build_context() -> dict:
@@ -334,7 +344,7 @@ def _handle_push_tomorrow(intent: dict, context: dict) -> dict:
 
     # Determine tomorrow's day name
     from datetime import timedelta
-    tomorrow = (datetime.utcnow() + timedelta(days=1)).strftime("%A").lower()
+    tomorrow = (_local_now() + timedelta(days=1)).strftime("%A").lower()
     task_id = task.get("id") or task.get("sk")
     db.update_item("TASK", task_id, {"day": tomorrow})
     task["day"] = tomorrow
@@ -375,7 +385,7 @@ def _handle_checkin_response(intent: dict, context: dict) -> dict:
             task["status"] = "skipped"
         elif status == "pushed":
             from datetime import timedelta
-            tomorrow = (datetime.utcnow() + timedelta(days=1)).strftime("%A").lower()
+            tomorrow = (_local_now() + timedelta(days=1)).strftime("%A").lower()
             db.update_item("TASK", task_id, {"day": tomorrow, "status": "todo"})
             task["day"] = tomorrow
 
@@ -436,7 +446,7 @@ def _handle_modify_behavior(intent: dict) -> dict:
         applies_until = _today()
     elif duration == "tomorrow":
         from datetime import timedelta
-        applies_until = (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
+        applies_until = (_local_now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
     item = {
         "pk": "BEHAVIOR",

@@ -3,7 +3,7 @@ import json
 import traceback
 from datetime import datetime
 
-from ..config import ANTHROPIC_API_KEY
+from ..config import ANTHROPIC_API_KEY, TIMEZONE
 
 _client = None
 
@@ -72,8 +72,15 @@ def _extract_json(text: str) -> dict:
 
 def _build_system_prompt(ctx: dict) -> str:
     """Build the full system prompt with all context injected."""
-    today = ctx.get("today", datetime.utcnow().strftime("%Y-%m-%d"))
-    day_of_week = ctx.get("day_of_week", datetime.utcnow().strftime("%A"))
+    def _local_now():
+        try:
+            from zoneinfo import ZoneInfo
+            return datetime.now(ZoneInfo(TIMEZONE))
+        except Exception:
+            return datetime.utcnow()
+
+    today = ctx.get("today", _local_now().strftime("%Y-%m-%d"))
+    day_of_week = ctx.get("day_of_week", _local_now().strftime("%A"))
     settings = ctx.get("settings", {})
     persona = settings.get("agent_persona", "David Goggins")
 
