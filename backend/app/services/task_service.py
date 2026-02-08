@@ -4,6 +4,11 @@ from .. import db
 from ..config import HOUR_DEFAULTS
 
 
+def _round_to_5min(minutes: int) -> int:
+    """Round minutes to nearest 5-minute multiple."""
+    return round(minutes / 5) * 5
+
+
 def find_matching_task(match_string: str, tasks: list[dict]) -> dict | None:
     """Fuzzy match a user description to a task name."""
     if not match_string or not tasks:
@@ -108,10 +113,15 @@ def create_task_from_intent(task_data: dict, context: dict) -> dict:
     block_start = task_data.get("time") or task_data.get("block_start")
     block_end = task_data.get("block_end")
     if block_start and not block_end:
-        # Auto-compute end from start + estimated hours
+        # Auto-compute end from start + estimated hours, rounded to 5-min
         try:
             h, m = map(int, block_start.split(":"))
-            total_min = h * 60 + m + int(hours * 60)
+            start_min = _round_to_5min(h * 60 + m)
+            duration_min = _round_to_5min(int(hours * 60))
+            if duration_min < 5:
+                duration_min = 5
+            total_min = start_min + duration_min
+            block_start = f"{start_min // 60:02d}:{start_min % 60:02d}"
             block_end = f"{total_min // 60:02d}:{total_min % 60:02d}"
         except (ValueError, AttributeError):
             pass

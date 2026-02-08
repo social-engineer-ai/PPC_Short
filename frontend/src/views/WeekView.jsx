@@ -271,7 +271,7 @@ export default function WeekView({ week, setWeek, tasks, projects, locked, capac
               </div>
               <div style={css.field}>
                 <label style={css.label}>Hours</label>
-                <input style={css.input} type="number" step="0.5" value={form.hours} onChange={(e) => setForm({ ...form, hours: +e.target.value || 0 })} />
+                <input style={css.input} type="number" step="0.25" min="0.25" value={form.hours} onChange={(e) => setForm({ ...form, hours: +e.target.value || 0 })} />
               </div>
               <div style={css.field}>
                 <label style={css.label}>Day</label>

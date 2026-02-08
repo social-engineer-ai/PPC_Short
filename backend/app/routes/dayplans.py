@@ -12,6 +12,16 @@ router = APIRouter()
 PRIO_ORDER = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
 
 
+def _round_to_5min(minutes: int) -> int:
+    """Round minutes to nearest 5-minute multiple."""
+    return round(minutes / 5) * 5
+
+
+def _fmt_time(minutes: int) -> str:
+    """Format minutes as HH:MM."""
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
 def _date_to_week_id(date_str: str) -> str:
     """Convert a date string 'YYYY-MM-DD' to ISO week ID 'YYYY-WNN'."""
     d = datetime.strptime(date_str, "%Y-%m-%d")
@@ -82,7 +92,9 @@ def generate_dayplan(date: str, _=Depends(verify_api_key)):
 
     for task in unscheduled:
         hours = task.get("estimated_hours", 1)
-        duration = int(hours * 60)
+        duration = _round_to_5min(int(hours * 60))
+        if duration < 5:
+            duration = 5
 
         # Skip to next available slot
         # Insert lunch break at noon if we cross it
@@ -100,13 +112,12 @@ def generate_dayplan(date: str, _=Depends(verify_api_key)):
         if current_minutes >= end_of_day:
             break
 
-        start_h, start_m = divmod(current_minutes, 60)
         end_minutes = min(current_minutes + duration, end_of_day)
-        end_h, end_m = divmod(end_minutes, 60)
+        end_minutes = _round_to_5min(end_minutes)
 
         blocks.append({
-            "start": f"{start_h:02d}:{start_m:02d}",
-            "end": f"{end_h:02d}:{end_m:02d}",
+            "start": _fmt_time(current_minutes),
+            "end": _fmt_time(end_minutes),
             "task_id": task["sk"],
             "type": "work",
             "label": task.get("name", ""),
@@ -117,13 +128,11 @@ def generate_dayplan(date: str, _=Depends(verify_api_key)):
         # Add 30-min break every 2.5 hours of work
         hours_since_start = (current_minutes - 480) / 60
         if hours_since_start > 0 and hours_since_start % 2.5 < 0.5 and current_minutes < end_of_day:
-            break_start_h, break_start_m = divmod(current_minutes, 60)
-            break_end = current_minutes + 30
-            break_end_h, break_end_m = divmod(break_end, 60)
+            break_end = _round_to_5min(current_minutes + 30)
             if current_minutes != 780:  # Don't double-add lunch break
                 blocks.append({
-                    "start": f"{break_start_h:02d}:{break_start_m:02d}",
-                    "end": f"{break_end_h:02d}:{break_end_m:02d}",
+                    "start": _fmt_time(current_minutes),
+                    "end": _fmt_time(break_end),
                     "task_id": None,
                     "type": "break",
                     "label": "Break",

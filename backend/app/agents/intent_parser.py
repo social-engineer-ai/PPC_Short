@@ -172,7 +172,7 @@ Task intake (smart — infer as much as possible):
         "priority": "urgent|high|normal|low",
         "estimated_hours": N or null (use defaults: Grading 1.5, Slides 2, Writing 2, Email 0.5, Call 0.5, Meeting 1),
         "day": "monday|tuesday|...|saturday|sunday" or null,
-        "time": "HH:MM" or null (24h format — e.g. "15:00" for 3pm, "09:30" for 9:30am. Parse "3pm"→"15:00", "10am"→"10:00", "noon"→"12:00"),
+        "time": "HH:MM" or null (24h format, 5-min multiples — e.g. "15:00" for 3pm, "09:30" for 9:30am, "14:45". Parse "3pm"→"15:00", "10am"→"10:00", "noon"→"12:00", "3:20pm"→"15:20"),
         "time_hint": "morning|afternoon|evening" or null,
         "due_date": "YYYY-MM-DD" or null,
         "course_week": "N" or null,
