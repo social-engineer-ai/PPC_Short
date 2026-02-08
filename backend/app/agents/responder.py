@@ -189,11 +189,17 @@ def _resp_query_today(context):
     if not tasks:
         return "No tasks scheduled for today."
     active = [t for t in tasks if t.get("status") not in ("dropped",)]
+    active.sort(key=lambda t: t.get("block_start") or "99:99")
     done = [t for t in active if t.get("status") == "done"]
     lines = [f"*TODAY* \u2014 {len(done)}/{len(active)} done\n"]
     for t in active:
         icon = "\u2705" if t["status"] == "done" else "\U0001F535" if t["status"] == "doing" else "\u2B1C"
-        lines.append(f"{icon} {t.get('name')} ({t.get('estimated_hours', 0)}h)")
+        time_str = ""
+        if t.get("block_start"):
+            time_str = f" @ {t['block_start']}"
+            if t.get("block_end"):
+                time_str += f"-{t['block_end']}"
+        lines.append(f"{icon} {t.get('name')} ({t.get('estimated_hours', 0)}h){time_str}")
     return "\n".join(lines)
 
 
@@ -223,10 +229,17 @@ def _resp_query_day(result):
     if not active:
         return f"Nothing scheduled for *{day_label}*."
     done = [t for t in active if t.get("status") == "done"]
+    # Sort by block_start time, unscheduled at the end
+    active.sort(key=lambda t: t.get("block_start") or "99:99")
     lines = [f"*{day_label.upper()}* \u2014 {len(done)}/{len(active)} done\n"]
     for t in active:
         icon = "\u2705" if t["status"] == "done" else "\U0001F535" if t["status"] == "doing" else "\u2B1C"
-        lines.append(f"{icon} {t.get('name')} ({t.get('estimated_hours', 0)}h)")
+        time_str = ""
+        if t.get("block_start"):
+            time_str = f" @ {t['block_start']}"
+            if t.get("block_end"):
+                time_str += f"-{t['block_end']}"
+        lines.append(f"{icon} {t.get('name')} ({t.get('estimated_hours', 0)}h){time_str}")
     return "\n".join(lines)
 
 
