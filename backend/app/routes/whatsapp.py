@@ -61,10 +61,14 @@ def _build_context() -> dict:
     dayplan = db.get_dayplan(today)
     chat_history = db.get_chat_log(today, limit=15)
 
+    now = _local_now()
+    current_time = now.strftime("%H:%M")
+
     return {
         "today": today,
         "week_id": week_id,
         "day_of_week": day_name.title(),
+        "current_time": current_time,
         "projects": projects,
         "week_tasks": week_tasks,
         "today_tasks": today_tasks,

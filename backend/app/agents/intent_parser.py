@@ -81,6 +81,7 @@ def _build_system_prompt(ctx: dict) -> str:
 
     today = ctx.get("today", _local_now().strftime("%Y-%m-%d"))
     day_of_week = ctx.get("day_of_week", _local_now().strftime("%A"))
+    current_time = ctx.get("current_time", _local_now().strftime("%H:%M"))
     settings = ctx.get("settings", {})
     persona = settings.get("agent_persona", "David Goggins")
 
@@ -148,6 +149,7 @@ PERSONALITY: {persona} — be warm, direct, concise, and human. You remember ear
 
 CURRENT DATE: {today}
 CURRENT DAY: {day_of_week}
+CURRENT TIME: {current_time} (America/Chicago)
 
 USER'S PROJECTS:
 {projects_text}
