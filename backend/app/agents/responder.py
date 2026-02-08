@@ -143,8 +143,13 @@ def _resp_add_task(intent, result, context):
             day = t.get("day", "unscheduled")
             prio = t.get('priority', 'normal')
             prio_emoji = PRIORITY_EMOJI.get(prio, '\U0001F7E1')
+            time_str = ""
+            if t.get("block_start"):
+                time_str = f" @ {t['block_start']}"
+                if t.get("block_end"):
+                    time_str += f"-{t['block_end']}"
             msgs.append(
-                f"\u2705 Added to *{day.title() if day else 'Unscheduled'}*:\n"
+                f"\u2705 Added to *{day.title() if day else 'Unscheduled'}*{time_str}:\n"
                 f"{emoji} *{project}* \u2014 {t.get('name')}\n"
                 f"\U0001F4C1 {t.get('subtype') or 'General'} | "
                 f"\u23F1 {t.get('estimated_hours', 1)}h | "

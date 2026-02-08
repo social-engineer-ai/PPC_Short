@@ -104,12 +104,26 @@ def create_task_from_intent(task_data: dict, context: dict) -> dict:
         dates = _week_id_to_dates(week_id)
         date = dates.get(day)
 
+    # Compute block_start / block_end from time if provided
+    block_start = task_data.get("time") or task_data.get("block_start")
+    block_end = task_data.get("block_end")
+    if block_start and not block_end:
+        # Auto-compute end from start + estimated hours
+        try:
+            h, m = map(int, block_start.split(":"))
+            total_min = h * 60 + m + int(hours * 60)
+            block_end = f"{total_min // 60:02d}:{total_min % 60:02d}"
+        except (ValueError, AttributeError):
+            pass
+
     item = {
         "pk": "TASK",
         "sk": task_id,
         "id": task_id,
         "week_id": week_id,
         "day": day,
+        "block_start": block_start,
+        "block_end": block_end,
         "project_id": project_id,
         "name": task_data.get("name", "Untitled"),
         "subtype": task_data.get("subtype", ""),
