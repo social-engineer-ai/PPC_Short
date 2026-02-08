@@ -561,9 +561,12 @@ def _handle_query_day(intent: dict, context: dict) -> dict:
 
 
 def _handle_chat(intent: dict, context: dict) -> dict:
-    """Save the user's thought as a note and acknowledge it."""
+    """Handle conversational messages. Optionally save as a note."""
     message = intent.get("message", "")
-    if message:
+    reply = intent.get("reply", "")
+    save = intent.get("save_as_note", False)
+
+    if save and message:
         note_id = str(uuid.uuid4())
         db.put_item({
             "pk": "AGENTNOTE",
@@ -575,7 +578,7 @@ def _handle_chat(intent: dict, context: dict) -> dict:
             "active": True,
             "created_at": datetime.utcnow().isoformat(),
         })
-    return {"noted": True, "message": message}
+    return {"reply": reply, "saved": save}
 
 
 def _record_checkin(date: str, task_id: str | None, check_type: str, message: str, response: str = None):

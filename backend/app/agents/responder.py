@@ -231,7 +231,11 @@ def _resp_query_day(result):
 
 
 def _resp_chat(result):
-    return "\U0001F4AC Noted. I saved that thought."
+    reply = result.get("reply", "")
+    if reply:
+        prefix = "\U0001F4CC " if result.get("saved") else ""
+        return f"{prefix}{reply}"
+    return "\U0001F4AC Got it."
 
 
 def _resp_checkin(intent, result, context):

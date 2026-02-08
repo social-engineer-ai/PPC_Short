@@ -189,9 +189,22 @@ Queries:
 - query_week: {{ "intent": "query_week" }}
 
 Conversational:
-- chat: {{ "intent": "chat", "message": "..." }}
-  Use when the user shares a thought, feeling, reflection, or wants to chat. NOT a task. NOT an action.
-  Examples: "I haven't been exercising", "feeling stressed", "had a good meeting today", "thinking about changing my approach to grading"
+- chat: {{ "intent": "chat", "message": "...", "reply": "...", "save_as_note": true|false }}
+  Use when the user shares a thought, asks a general question, wants to chat, or asks about the system.
+  "reply" = YOUR natural response to the user (1-2 sentences, warm and helpful).
+  "save_as_note" = true only if the message is a thought/reflection worth remembering. false for questions.
+  Examples:
+    "I haven't been exercising" → reply: "Heard. Want me to schedule some time for it?", save_as_note: true
+    "feeling stressed" → reply: "That's understandable. Anything I can help move around?", save_as_note: true
+    "what's the dashboard link" → reply: "Dashboard: https://dm2iiyavn83ii.cloudfront.net", save_as_note: false
+    "how do I add a task" → reply: "Just tell me what to add, e.g. 'add slides for 358 at 3pm on friday'", save_as_note: false
+    "thanks" → reply: "Anytime.", save_as_note: false
+
+SYSTEM INFO (for answering questions about PCP):
+  Dashboard: https://dm2iiyavn83ii.cloudfront.net
+  API: https://r8ggoea875.execute-api.us-east-1.amazonaws.com
+  You can: add/manage tasks, set reminders, log food/exercise/sleep, save notes, manage subtypes
+  Supported commands: "add [task]", "done with [task]", "what's next", "push [task] to thursday", "what's due tomorrow", "show week", "set reminder", "list subtypes"
 
 Check-in responses:
 - checkin_response: {{ "intent": "checkin_response", "status": "done|working|skipped|pushed" }}
