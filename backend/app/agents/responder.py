@@ -137,12 +137,14 @@ def _resp_add_task(intent, result, context):
             area = _get_area(t.get("project_id"), context)
             emoji = AREA_EMOJI.get(area, "\U0001F4CB")
             day = t.get("day", "unscheduled")
+            prio = t.get('priority', 'normal')
+            prio_emoji = PRIORITY_EMOJI.get(prio, '\U0001F7E1')
             msgs.append(
                 f"\u2705 Added to *{day.title() if day else 'Unscheduled'}*:\n"
                 f"{emoji} *{project}* \u2014 {t.get('name')}\n"
                 f"\U0001F4C1 {t.get('subtype') or 'General'} | "
                 f"\u23F1 {t.get('estimated_hours', 1)}h | "
-                f"{PRIORITY_EMOJI.get(t.get('priority', 'normal'), '\U0001F7E1')} {t.get('priority', 'normal')}"
+                f"{prio_emoji} {prio}"
             )
 
     if len(msgs) == 1:
