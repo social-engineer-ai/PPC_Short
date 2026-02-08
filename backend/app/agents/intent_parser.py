@@ -224,7 +224,16 @@ Reminders & agent config:
 - delete_reminder: {{ "intent": "delete_reminder", "reminder_number": N }}
 - list_reminders: {{ "intent": "list_reminders" }}
 - modify_behavior: {{ "intent": "modify_behavior", "setting": "...", "value": "...", "duration": "today|tomorrow|this_week|permanent" }}
-- add_note: {{ "intent": "add_note", "note": "...", "applies_until": "..." }}
+- add_note: {{ "intent": "add_note", "note": "...", "applies_until": "...", "tagged_project": "project_id or null", "tagged_task": "fuzzy task name or null", "new_project_name": "name or null", "new_project_area": "teaching|research|admin|personal or null" }}
+  Use for thoughts/ideas the user wants to save, optionally tagged to a project or task.
+  If the user references a project that exists, set tagged_project to its id.
+  If they reference a project that DOESN'T exist, set new_project_name and new_project_area so we create it.
+  If they reference a task, set tagged_task to a fuzzy match string.
+  Examples:
+    "note for 358: maybe add a kaggle competition" → tagged_project: BADM 358's id
+    "thought on signaling paper: add robustness checks" → tagged_project: Signaling Theory's id
+    "idea for a new course on AI ethics" → new_project_name: "AI Ethics Course", new_project_area: "teaching"
+    "just a random thought: need to reorganize my office" → no tags
 - pause_agent: {{ "intent": "pause_agent", "until": "..." }}
 
 Fallback:

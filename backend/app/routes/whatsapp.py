@@ -446,6 +446,39 @@ def _handle_modify_behavior(intent: dict) -> dict:
 def _handle_add_note(intent: dict) -> dict:
     note_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
+
+    # Auto-create project if referenced but doesn't exist
+    new_project = None
+    project_id = intent.get("tagged_project")
+    if not project_id and intent.get("new_project_name"):
+        proj_id = str(uuid.uuid4())
+        area = intent.get("new_project_area", "admin")
+        new_project = {
+            "pk": "PROJECT",
+            "sk": proj_id,
+            "id": proj_id,
+            "name": intent["new_project_name"],
+            "area": area,
+            "description": "",
+            "match_keywords": [],
+            "active": True,
+            "created_at": now,
+            "updated_at": now,
+        }
+        db.put_item(new_project)
+        project_id = proj_id
+
+    # Fuzzy-match tagged task
+    tagged_task_id = None
+    tagged_task_name = None
+    if intent.get("tagged_task"):
+        from ..services.task_service import find_matching_task
+        week_tasks = db.get_tasks_for_week(_week_id())
+        matched = find_matching_task(intent["tagged_task"], week_tasks)
+        if matched:
+            tagged_task_id = matched.get("id") or matched.get("sk")
+            tagged_task_name = matched.get("name")
+
     item = {
         "pk": "AGENTNOTE",
         "sk": note_id,
@@ -455,11 +488,19 @@ def _handle_add_note(intent: dict) -> dict:
         "applies_until": intent.get("applies_until"),
         "affects": "general",
         "active": True,
+        "tagged_project_id": project_id,
+        "tagged_task_id": tagged_task_id,
         "created_at": now,
     }
     item = {k: v for k, v in item.items() if v is not None}
     db.put_item(item)
-    return {"note": intent.get("note", "")}
+
+    return {
+        "note": intent.get("note", ""),
+        "tagged_project_id": project_id,
+        "tagged_task_name": tagged_task_name,
+        "new_project": new_project,
+    }
 
 
 def _handle_health_log(intent: dict, context: dict) -> dict:

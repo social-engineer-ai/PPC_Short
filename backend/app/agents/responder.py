@@ -284,7 +284,19 @@ def _resp_modify_behavior(result):
 
 
 def _resp_add_note(result):
-    return f"\U0001F4CC Noted: {result.get('note', '')}"
+    note = result.get("note", "")
+    msg = f"\U0001F4CC Noted: {note}"
+
+    if result.get("new_project"):
+        proj = result["new_project"]
+        msg += f"\n\u2795 Created new project: *{proj.get('name')}* ({proj.get('area')})"
+
+    if result.get("tagged_task_name"):
+        msg += f"\n\U0001F3F7 Tagged to task: *{result['tagged_task_name']}*"
+    elif result.get("tagged_project_id"):
+        msg += f"\n\U0001F3F7 Tagged to project"
+
+    return msg
 
 
 def _resp_log_food(intent):
