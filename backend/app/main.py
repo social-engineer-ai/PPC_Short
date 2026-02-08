@@ -26,8 +26,9 @@ app.include_router(settings.router, prefix="/settings", tags=["settings"])
 
 # Phase 2 routes (imported when available)
 try:
-    from .routes import whatsapp, reminders, agent_notes, behavior
+    from .routes import whatsapp, telegram, reminders, agent_notes, behavior
     app.include_router(whatsapp.router, prefix="/whatsapp", tags=["whatsapp"])
+    app.include_router(telegram.router, prefix="/telegram", tags=["telegram"])
     app.include_router(reminders.router, prefix="/reminders", tags=["reminders"])
     app.include_router(agent_notes.router, prefix="/agent-notes", tags=["agent-notes"])
     app.include_router(behavior.router, prefix="/behavior", tags=["behavior"])

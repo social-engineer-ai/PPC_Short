@@ -16,6 +16,8 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 TIMEZONE = os.getenv("TIMEZONE", "America/Chicago")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 LOCAL_DYNAMODB_URL = os.getenv("LOCAL_DYNAMODB_URL", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 LAMBDA_ARN = os.getenv("LAMBDA_ARN", "")
 SCHEDULER_ROLE_ARN = os.getenv("SCHEDULER_ROLE_ARN", "")
 
